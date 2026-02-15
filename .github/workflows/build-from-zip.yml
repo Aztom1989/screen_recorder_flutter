@@ -1,0 +1,54 @@
+name: Build APK from ZIP (Flutter)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unzip project if needed
+        run: |
+          if [ -f "screen_recorder_flutter.zip" ]; then
+            rm -rf _tmp_unzip
+            mkdir _tmp_unzip
+            unzip -q screen_recorder_flutter.zip -d _tmp_unzip
+
+            # If the zip contains a top folder, move its contents to repo root
+            TOP=$(find _tmp_unzip -maxdepth 1 -type d -name "screen_recorder_flutter" | head -n 1 || true)
+            if [ -n "$TOP" ]; then
+              rsync -a "$TOP/" ./
+            else
+              rsync -a "_tmp_unzip/" ./
+            fi
+
+            rm -rf _tmp_unzip
+          fi
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build debug APK
+        run: flutter build apk --debug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
